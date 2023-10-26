@@ -1,5 +1,3 @@
-# days 1
-
 ## study typora!:small_airplane:
 
 ### 试试删除

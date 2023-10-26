@@ -1,5 +1,3 @@
-# days 2
-
 ## study C#:book:
 
 ### 变量调用
