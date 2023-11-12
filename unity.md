@@ -71,7 +71,11 @@ transform,scale,可以改变人物面向
 1. 定义一个jumpforce`public float jumpforce`
 2. 接受玩家反馈：`if(Input.GetButtonDown("Jump"))`
 3. 可调整jumpforce和gravity scale来改变跳起高度捏
-4. ==按空格键有时跳跃有时不动解决方法==不能同时使用fixedupdate和 time.deltatime(建议将time.deltatime改为==time.fixedDeltatime==并将fixedupdate改为==update==)
+4. ==按空格键有时跳跃有时不动解决方法==
+   * fixedupdate对应time.fixeddeltatime
+   * update对应time.deltatime
+   * :exclamation:rb在fixedupdate中使用
+   * :exclamation:getbutton在update中使用
 
 ### 动画效果
 
@@ -89,6 +93,8 @@ transform,scale,可以改变人物面向
 4. 在代码中编写条件，将animator拖入框中控制
 
 #### 实现跳跃的动画效果
+
+==idle是初始动画，以下相关操作可以不进行==
 
 1. 分别创建fall down两个动画，设置动画之间关系，并设计两个bool型变量来控制
 
@@ -268,7 +274,7 @@ transform,scale,可以改变人物面向
             rb.velocity = new Vector2(-speed, rb.velocity.y);
             if(transform.position .x<leftpoint.position.x)
             {
-                transform.localScale = new Vector3(-1, 1, 1);
+                transform.localScale = new Vector3(-1, 1, 1);//改变方向
                 Faceleft = false;
             }
         }
@@ -334,6 +340,7 @@ transform,scale,可以改变人物面向
        //这里全部使用public
        public void Death()
        {
+            GetComponent<Collider2D>().enabled = false;//避免二次碰撞
            Destroy(gameObject);
        }
        public void JumpOn()
@@ -366,5 +373,349 @@ transform,scale,可以改变人物面向
    ```
 
 5. 设置另一个人物的audio source时可以直接copy component,paste component as new
+
 6. 添加人物跳跃的声音，再给player加一个audi source,重复以上操作，`public AudioSource JumpAudio;`,拖动对应音频到代码框
+
+   （一次性重命名ctrl+R）
+
+### 对话框Dialog
+
+1. canvas,UI,panel,更改颜色和定位位置
+
+2. 在panel中创建text,可以去store里面找找字体，然后疯狂调整颜色和大小直到在Game窗口中看得合理
+
+3. 设置一关到下一关的触发点：在相应位置添加碰撞体(例如：the door(?)),并将其设置为trigger
+
+4. 设置为碰撞到才会启动对话框，离开时对话框消失：为碰撞体新增一个代码，命名为enterdialog,选择人物的tag
+
+   ```c#
+   public class enterDialog : MonoBehaviour
+   {
+       public GameObject enter;//将需要的对话框拖动过来
+       private void OnTriggerEnter2D(Collider2D collision)
+       {
+           if (collision.tag == "Player")
+           {
+               enter.SetActive(true);
+               //setactive使gameobject显示或不显示
+           }
+       }
+       private void OnTriggerExit2D(Collider2D collision)
+   {
+       if (collision.tag == "Player")
+       {
+           Enter.SetActive(false); ;
+       }
+   }
+   }
+   ```
+
+   （tag请务必注意大小写，QWQ，差点死在这里了）
+
+5. 先将需要后续触发的对话框勾选掉
+
+5. 让dialog有渐入的效果：创建一个animation,拖动到enter dialog,点击红色按钮开始录制，设置框和文字的不透明度来达到效果
+
+### 增加趴下状态
+
+1. 点开gizmos可以看到运动中的碰撞体
+2. 趴下时上方coll消失，起立再重现：将要关掉的coll设置为discoll,便于调整`public Collider2D Discoll;`,趴下动画切换时`Discoll.enabled = false;//禁用效果`,同样设置重现
+3. 当上方有物体时不能起立：再趴下动画之前先判断`if (!Physics2D.OverlapCircle(cellingcheck.position,0.2f,ground))`
+   * 第一个获取项是定位点，用子项目的方法设置在角色头顶处
+   * 第二个获取项是判断的范围
+   * 第三个获取项是需要判断的碰撞体
+
+### 场景控制sceneManager
+
+1. 人物掉落到边界，触发死亡效果，并重置游戏：
+
+   *  创建一个新项目，添加coll，按住alt以中心点为轴拖动到边框处，设置为trigger
+
+   * 让有戏重置需要使用`using UnityEngine.SceneManagement;`
+
+   * ```c#
+      if (collision.tag == "Deadline")
+      {
+          SceneManager.LoadScene(SceneManager.GetActiveScene().name);//获得当前场景开始的效果
+      }
+     ```
+
+   * 设置delay，死亡时音乐消失
+
+     ```
+     if (collision.tag == "Deadline")
+     {//延迟播放（字符型函数名，延迟时间）
+         Invoke("Restart", 2f);
+     }
+      void Restart()
+      {
+       GetComponent<AudioSource>().enabled = false;    SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+      }
+     ```
+
+
+2. 碰到门时按下按键进入下一个场景：
+
+   ```c#
+   using UnityEngine.SceneManagement;
+   
+   public class Enterdoor : MonoBehaviour
+   {
+       void Update()
+       {
+           if(Input.GetKeyDown(KeyCode.E))
+           {
+               SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);//当前场景编号加一
+           }
+       }
+   }
+   ```
+
+   编号查看：file,bulid settings
+
+   将代码加载在提示框中，使只有提示框出现时才能有效触发按键，进入下一个场景
+
+### 2D光效
+
+1. 需要先暗下去才能亮起来(?)：选中所有grid在tilemap render中将material改为default-diffuse(散射光的材质)
+2. 给其他物体(例如player和environment)自己做一个material,直接在assets中右键创建一个material，shader中选择diffuse，拖到第二个场景的material中(不要在perfabs里面改动)
+3. 给画面添加光源：在右边栏里面添加light,point light
+4. ==Grid里面线的修改==：
+   * 第一关蓝线未被渲染：将cell size改为0.99 0.99
+   * 第二关灯光照射出蓝色的线：将cell size改为1 1
+
+5. 我们的光是3D的:waxing_crescent_moon:
+   * 将scene的2D关掉可以体验到3D效果
+   * 按鼠标右键加W A S D可以四处乱逛
+   * 如果有必要能调整一下灯的远近
+
+6. 做出一个明亮的火焰！：调节光的range,color,intensity(强度)，将point light指向火焰，ctrl+D添加到其他火焰上
+7. 让player亮起来：给player加一个子项目(point light)跟player一起移动,并调整z轴距离
+8. 给其他东西加一点light
+
+### 使collections数量正常
+
+(避免在人物运动太快的时候不计数)
+
+* 设置一个collection消失的动画，在动画结束后加上animation events,实现death效果
+
+  ```c#
+  public class cherry : MonoBehaviour
+  {
+      public void Death()
+      {
+          FindObjectOfType<playercontroller>().CherryCount();//调用别的object里面的函数
+          Destroy(gameObject); 
+      }
+  }
+  
+  ```
+
+* 在player代码中播放动画
+
+  ```c#
+  if (collision.tag == "cherry")
+  {
+      GetcherryAudio.Play();
+      collision.GetComponent<Animator>().Play("isGet");
+      //CherryNum.text = cherry.ToString();
+      //这一行在update里面使用，每帧更新一次
+  }
+  ```
+
+
+### 视觉差parallax
+
+(让画面更有层次感)
+
+1. 新建一个文件，用于继承background的coll，将其拖到virtual camera缺失框中
+
+2. 让背景，中景，前景跟随摄像机的移动：新将一个代码parallax
+
+   ```c#
+   public class NewBehaviourScript : MonoBehaviour
+   {
+       public Transform Cam;//main camera
+       public float moveRate;//移动范围
+       private float startPoint;//初始点
+       
+       void Start()
+       {
+           startPoint = transform.position.x;
+       }
+   
+       // Update is called once per frame
+       void Update()
+       {
+           transform.position = new Vector2(startPoint + Cam.position.x * moveRate, transform.position.y);
+       }
+   }
+   ```
+
+   将其放进不同的objects中，调整不同的moverate
+
+3. 有时需要y轴也跟随镜头移动，修改代码
+
+   ```c#
+    public Transform Cam;
+    public float moveRate;
+    private float startPointX, startPointY;
+    public bool lockY;//判定是否需要打开y轴视觉差
+    
+    void Start()
+    {
+        startPointX = transform.position.x;
+        startPointY = transform.position.y;
+   //需要这两个变量先定义一边，避免数据变化产生错误
+    }
+   
+    
+    void Update()
+    {
+        if (lockY)
+        {
+            transform.position = new Vector2(startPointX + Cam.position.x * moveRate, transform.position.y);
+        }else
+        {
+            transform.position = new Vector2(startPointX + Cam.position.x * moveRate , startPointY + Cam.position.y * moveRate);
+        }
+    }
+   ```
+
+### 主菜单main menu
+
+1. 创建一个新的场景menu，添加一个panel(圆角矩形)，将source image改为none,使其完全填充
+
+2. 将准备号的图片拖动到panel框中，改变亮度
+
+3. 再调一个panel滤镜来承接按钮们，记得改名来区分一下，给这个项目添加一个子项目UI，button—textmeshpro(后缀是让字体更丰富)
+   * 调整button及其text的大小和位置，
+   * 调整text字体，字体样式及其颜色(可以选择渐变色color gradient)
+   * 调整button的颜色(不要在image里面更改)，将normal color透明度改为0，可使其在鼠标未到达时没有颜色:heavy_check_mark:
+   * 创建一个title
+
+4. 用代码来控制：
+
+   ```c#
+   using UnityEngine.SceneManagement;
+   
+   public class Menu : MonoBehaviour
+   {
+       public void Play()
+       {
+           SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);//记得在bulid settings里面添加
+       }
+        public void Exit()
+    {
+        Application.Quit();
+    }
+       
+   }
+   ```
+
+   * 先将代码赋给mainmenu(包含button和title的项目)
+   * button想要调用其中的函数，在下方on click,将mainmenu拖动过来，选中相应函数
+
+5. 让游戏滤镜画面缓慢出现：先将source image改为none,使其完全填充，[接下来看这里](#对话框Dialog),将动画效果的loop删掉
+
+5. 颜色出现以后，文字才出现：将所有的文字塞进新的空项目里，来控制这个项目的启动(命名为UI)
+
+   ```c#
+   public void UIEnable()
+   {
+       GameObject.Find("Canvas/Mainmenu/UI").SetActive(true);//寻找到这个项目并将其开启
+   }
+   ```
+   
+
+### 暂停菜单AudioMixer
+
+1. 先创建一个pause的button
+
+2. 再来一个panel,当作pause的menu,包含一个text(PauseMenu),一个滑动条，一个退出按钮
+
+   * 滑动条:UI,slider background(背景)，fidd area(填充区域)，handle slide area(滑动的钮)
+
+3. 用代码实现：
+
+   ```c#
+   public GameObject pauseMenu;//先获得
+    public void PauseGame()
+    {
+        pauseMenu.SetActive(true);
+    }
+   ```
+
+   可将代码挂载再canve下面，再在pause按钮里面加载函数
+
+   退出实现：
+
+   ```c#
+   public void ResumeGame()
+   {
+       pauseMenu.SetActive(false );
+   }
+   ```
+
+   在resume里面获得
+
+4. 想要暂停时游戏人物及其他物体都不运动，需要控制时间比例：`Time.timeScale = 0f;`,恢复可改为1，慢速可设置为0.5
+
+5. 用slider来调整声音：
+   * 在assets创建一个AudioMixer
+   
+   * window,audio,audiomixer,打开调音台
+   
+   * 将bgm的output改为master，即可在调音台里操作，将滑动条的最大和最小值与调音台相同，最小改为-80,最大改为0
+   
+   * link:先调用`using UnityEngine.Audio;`
+   
+     ```c#
+     public void SetVolume(float value)//读入声音
+     {
+         audioMixer.SetFloat("Mainvolume", value);//（调音台函数名，在这个函数里面的命名）
+     }
+     ```
+   
+     :exclamation:想要获得audiomixer的函数调用，需要选中需要的部分，在inspector框中，右键此部分选则expose,然后返回Audiomixer在exposed parameters里面查看并重命名(回车)
+   
+   * slider选择时记得选择没有引用量的那一个
+   * 哪个声音需要可调就把其output改为master
+
+### 手机控制|触控操作|真机测试
+
+（啊？好神奇）
+
+1. 去file,build settings,switch platform
+
+### 二段跳(其实是三段跳)
+
+```c#
+//先在让人物脚下创建一个子项目，检测是否在地上
+public bool isground;
+isground = Physics2D.OverlapCircle(groundcheck.position,0.2f,ground);//这个在fixedupdate里面执行
+public int extraJump;
+void newJump()//这个放到update里面去
+ {
+     if (isground)
+     {
+         extraJump = 2;
+     }
+     if(Input.GetButtonDown("Jump")&&extraJump > 0)
+     {
+         rb.velocity = Vector2.up * jumpfroce;
+         extraJump--;
+         anim.SetBool("jumping", true);
+     }
+     if(Input.GetButtonDown ("Jump")&&extraJump ==0&&isground)
+     {
+         rb.velocity = Vector2.up * jumpfroce;//建议jumpforce设小一点
+         anim.SetBool("jumping", true);
+     }
+ }
+```
+
+
+
+
 
